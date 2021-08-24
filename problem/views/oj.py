@@ -46,12 +46,20 @@ class ProblemAPI(APIView):
                     problem["my_status"] = oi_problems_status.get(str(problem["id"]), {}).get("status")
 
     def get(self, request):
+        query = Q(contest_id__isnull=True)
+        if not request.user.is_authenticated:
+            query &= Q(visible=True)
+        elif request.user.can_mgmt_all_problem():
+            pass
+        elif request.user.is_problem_author():
+            query &= Q(visible=True) | Q(created_by=request.user)
+        else: query &= Q(visible=True)
         # 问题详情页
         problem_id = request.GET.get("problem_id")
         if problem_id:
             try:
                 problem = Problem.objects.select_related("created_by") \
-                    .get(_id=problem_id, contest_id__isnull=True, visible=True)
+                    .get(Q(_id=problem_id) & query)
                 problem_data = ProblemSerializer(problem).data
                 self._add_problem_status(request, problem_data)
                 return self.success(problem_data)
@@ -62,7 +70,7 @@ class ProblemAPI(APIView):
         if not limit:
             return self.error("Limit is needed")
 
-        problems = Problem.objects.select_related("created_by").filter(contest_id__isnull=True, visible=True)
+        problems = Problem.objects.select_related("created_by").filter(query)
         # 按照标签筛选
         tag_text = request.GET.get("tag")
         if tag_text:
