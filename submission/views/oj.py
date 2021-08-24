@@ -1,7 +1,8 @@
 import ipaddress
 
+from django.utils.timezone import now
 from account.decorators import login_required, check_contest_permission
-from contest.models import ContestStatus, ContestRuleType
+from contest.models import ContestStatus, ContestRuleType, Contest
 from judge.tasks import judge_task
 from options.options import SysOptions
 # from judge.dispatcher import JudgeDispatcher
@@ -104,6 +105,13 @@ class SubmissionAPI(APIView):
             submission_data = SubmissionSafeModelSerializer(submission).data
         # 是否有权限取消共享
         submission_data["can_unshare"] = submission.check_user_permission(request.user, check_share=False)
+        if not request.user.is_admin_role():
+            contests = Contest.objects.select_related("created_by").filter(visible=True)
+            cur = now()
+            contests = contests.filter(start_time__lte=cur, end_time__gte=cur)
+            contests = contests.filter(lock_all_submission_code=True)
+            if len(contests) != 0:
+                submission_data["code"] = "Code detail is temporarily disabled during contest."
         return self.success(submission_data)
 
     @validate_serializer(ShareSubmissionSerializer)
