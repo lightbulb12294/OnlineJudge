@@ -614,7 +614,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                                                              languages=SysOptions.language_names,
                                                              created_by=request.user,
                                                              visible=False,
-                                                             difficulty=Difficulty.MID,
+                                                             difficulty=Difficulty.HIDE,
                                                              total_score=sum(item["score"] for item in test_case_score)
                                                              if rule_type == ProblemRuleType.OI else 0,
                                                              test_case_id=test_case_id

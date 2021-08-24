@@ -23,6 +23,7 @@ class ProblemDifficulty(object):
     High = "High"
     Mid = "Mid"
     Low = "Low"
+    Hide = "Hidden"
 
 
 class ProblemIOMode(Choices):
