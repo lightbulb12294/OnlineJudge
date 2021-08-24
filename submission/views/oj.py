@@ -1,6 +1,7 @@
 import ipaddress
 
 from django.utils.timezone import now
+from django.db.models import Q
 from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType, Contest
 from judge.tasks import judge_task
@@ -67,7 +68,13 @@ class SubmissionAPI(APIView):
             return self.error(error)
 
         try:
-            problem = Problem.objects.get(id=data["problem_id"], contest_id=data.get("contest_id"), visible=True)
+            query = Q(id=data["problem_id"], contest_id=data.get("contest_id"))
+            if request.user.can_mgmt_all_problem():
+                pass
+            elif request.user.is_problem_author():
+                query &= Q(visible=True) | Q(created_by=request.user)
+            else: query &= Q(visible=True)
+            problem = Problem.objects.get(query)
         except Problem.DoesNotExist:
             return self.error("Problem not exist")
         if data["language"] not in problem.languages:
@@ -93,7 +100,13 @@ class SubmissionAPI(APIView):
         if not submission_id:
             return self.error("Parameter id doesn't exist")
         try:
-            submission = Submission.objects.select_related("problem").get(id=submission_id)
+            query = Q(id=submission_id)
+            if request.user.can_mgmt_all_problem():
+                pass
+            elif request.user.is_problem_author():
+                query &= Q(problem__visible=True) | Q(problem__created_by=request.user)
+            else: query &= Q(problem__visible=True)
+            submission = Submission.objects.select_related("problem").get(query)
         except Submission.DoesNotExist:
             return self.error("Submission doesn't exist")
         if not submission.check_user_permission(request.user):
@@ -147,7 +160,15 @@ class SubmissionListAPI(APIView):
         username = request.GET.get("username")
         if problem_id:
             try:
-                problem = Problem.objects.get(_id=problem_id, contest_id__isnull=True, visible=True)
+                query = Q(_id=problem_id, contest_id__isnull=True)
+                if not request.user.is_authenticated:
+                    query &= Q(visible=True)
+                elif request.user.can_mgmt_all_problem():
+                    pass
+                elif request.user.is_problem_author():
+                    query &= Q(visible=True) | Q(created_by=request.user)
+                else: query &= Q(visible=True)
+                problem = Problem.objects.get(query)
             except Problem.DoesNotExist:
                 return self.error("Problem doesn't exist")
             submissions = submissions.filter(problem=problem)
@@ -157,6 +178,15 @@ class SubmissionListAPI(APIView):
             submissions = submissions.filter(username__icontains=username)
         if result:
             submissions = submissions.filter(result=result)
+        query = Q()
+        if not request.user.is_authenticated:
+            query &= Q(problem__visible=True)
+        elif request.user.can_mgmt_all_problem():
+            pass
+        elif request.user.is_problem_author():
+            query &= Q(problem__visible=True) | Q(problem__created_by=request.user)
+        else: query &= Q(problem__visible=True)
+        submissions = submissions.filter(query)
         data = self.paginate_data(request, submissions)
         data["results"] = SubmissionListSerializer(data["results"], many=True, user=request.user).data
         return self.success(data)
