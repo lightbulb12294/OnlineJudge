@@ -313,9 +313,11 @@ class JudgeDispatcher(DispatcherBase):
                     contest_problems_status[problem_id] = {"status": self.submission.result,
                                                            "_id": self.problem._id,
                                                            "score": score}
-                else:
+                elif contest_problems_status[problem_id]["score"] < score:
                     contest_problems_status[problem_id]["score"] = score
                     contest_problems_status[problem_id]["status"] = self.submission.result
+                else:
+                    return
                 user_profile.oi_problems_status["contest_problems"] = contest_problems_status
                 user_profile.save(update_fields=["oi_problems_status"])
 
@@ -395,6 +397,8 @@ class JudgeDispatcher(DispatcherBase):
         problem_id = str(self.submission.problem_id)
         current_score = self.submission.statistic_info["score"]
         last_score = rank.submission_info.get(problem_id)
+        if last_score and last_score >= current_score:
+            return
         if last_score:
             rank.total_score = rank.total_score - last_score + current_score
         else:
