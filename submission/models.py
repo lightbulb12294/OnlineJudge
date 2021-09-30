@@ -45,7 +45,7 @@ class Submission(models.Model):
             return True
 
         if check_share:
-            if self.contest and self.contest.status != ContestStatus.CONTEST_ENDED:
+            if self.contest and self.contest.status != ContestStatus.CONTEST_ENDED and not (self.contest.underway_share and self.contest.status == ContestStatus.CONTEST_UNDERWAY):
                 return False
             if self.problem.share_submission or self.shared:
                 return True
