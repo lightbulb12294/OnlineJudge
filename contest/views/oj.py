@@ -143,7 +143,7 @@ class ContestRankAPI(APIView):
 
         if download_csv:
             data = serializer(qs, many=True, is_contest_admin=is_contest_admin).data
-            contest_problems = Problem.objects.filter(contest=self.contest, visible=True).order_by("_id")
+            contest_problems = Problem.objects.filter(contest=self.contest).order_by("_id")
             problem_ids = [item.id for item in contest_problems]
 
             f = io.BytesIO()
