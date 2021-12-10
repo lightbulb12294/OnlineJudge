@@ -1,4 +1,5 @@
 import io
+import ipaddress
 
 import xlsxwriter
 from django.http import HttpResponse
@@ -41,6 +42,11 @@ class ContestAPI(APIView):
             contest = Contest.objects.get(id=id, visible=True)
         except Contest.DoesNotExist:
             return self.error("Contest does not exist")
+        if not request.user.is_contest_admin(contest):
+            user_ip = ipaddress.ip_address(request.session.get("ip"))
+            if contest.allowed_ip_ranges:
+                if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
+                    return self.error("Your IP is not allowed in this contest")
         data = ContestSerializer(contest).data
         data["now"] = datetime2str(now())
         return self.success(data)
