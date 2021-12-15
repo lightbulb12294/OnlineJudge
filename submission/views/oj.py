@@ -7,6 +7,7 @@ from contest.models import ContestStatus, ContestRuleType, Contest
 from judge.tasks import judge_task
 from options.options import SysOptions
 # from judge.dispatcher import JudgeDispatcher
+from judge.dispatcher import JudgeSampleTester
 from problem.models import Problem, ProblemRuleType
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
@@ -239,3 +240,63 @@ class SubmissionExistsAPI(APIView):
         return self.success(request.user.is_authenticated and
                             Submission.objects.filter(problem_id=request.GET["problem_id"],
                                                       user_id=request.user.id).exists())
+
+class SampleTestAPI(APIView):
+    def throttling(self, request):
+        # 使用 open_api 的请求暂不做限制
+        auth_method = getattr(request, "auth_method", "")
+        if auth_method == "api_key":
+            return
+        user_bucket = TokenBucket(key=str(request.user.id),
+                                  redis_conn=cache, **SysOptions.throttling["user"])
+        can_consume, wait = user_bucket.consume()
+        if not can_consume:
+            return "Please wait %d seconds" % (int(wait))
+
+    @check_contest_permission(check_type="problems")
+    def check_contest_permission(self, request):
+        contest = self.contest
+        if contest.status == ContestStatus.CONTEST_ENDED:
+            return self.error("The contest have ended")
+        if not request.user.is_contest_admin(contest):
+            user_ip = ipaddress.ip_address(request.session.get("ip"))
+            if contest.allowed_ip_ranges:
+                if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
+                    return self.error("Your IP is not allowed in this contest")
+
+    @validate_serializer(CreateSubmissionSerializer)
+    @login_required
+    def post(self, request):
+        data = request.data
+        if data.get("contest_id"):
+            error = self.check_contest_permission(request)
+            if error:
+                return error
+            contest = self.contest
+            if not contest.problem_details_permission(request.user):
+                hide_id = True
+
+        if data.get("captcha"):
+            if not Captcha(request).check(data["captcha"]):
+                return self.error("Invalid captcha")
+        error = self.throttling(request)
+        if error:
+            return self.error(error)
+
+        try:
+            query = Q(id=data["problem_id"], contest_id=data.get("contest_id"))
+            if request.user.can_mgmt_all_problem():
+                pass
+            elif request.user.is_problem_author():
+                query &= Q(visible=True) | Q(created_by=request.user)
+            else: query &= Q(visible=True)
+            problem = Problem.objects.get(query)
+        except Problem.DoesNotExist:
+            return self.error("Problem not exist")
+        if data["language"] not in problem.languages:
+            return self.error(f"{data['language']} is now allowed in the problem")
+        if problem.sampletest == False:
+            return self.error("Sample test is not supported in this problem.")
+
+        resp = JudgeSampleTester(data['code'], data['language'], data['problem_id']).judge()
+        return self.success(resp)
