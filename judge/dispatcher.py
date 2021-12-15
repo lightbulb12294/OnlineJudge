@@ -405,3 +405,53 @@ class JudgeDispatcher(DispatcherBase):
             rank.total_score = rank.total_score + current_score
         rank.submission_info[problem_id] = current_score
         rank.save()
+
+class JudgeSampleTester(DispatcherBase):
+    def __init__(self, src, language, problem_id):
+        super().__init__()
+        self.code = src
+        self.language = language
+        self.problem = Problem.objects.get(id=problem_id)
+
+    def judge(self):
+        language = self.language
+        sub_config = list(filter(lambda item: language == item["name"], SysOptions.languages))[0]
+        spj_config = {}
+        if self.problem.spj_code:
+            for lang in SysOptions.spj_languages:
+                if lang["name"] == self.problem.spj_language:
+                    spj_config = lang["spj"]
+                    break
+
+        if language in self.problem.template:
+            template = parse_problem_template(self.problem.template[language])
+            code = f"{template['prepend']}\n{self.code}\n{template['append']}"
+        else:
+            code = self.code
+
+        data = {
+            "language_config": sub_config["config"],
+            "src": code,
+            "max_cpu_time": self.problem.time_limit,
+            "max_memory": 1024 * 1024 * self.problem.memory_limit,
+            "test_case_id": self.problem.test_case_id,
+            "output": True,
+            "spj_version": self.problem.spj_version,
+            "spj_config": spj_config.get("config"),
+            "spj_compile_config": spj_config.get("compile"),
+            "spj_src": self.problem.spj_code,
+            "io_mode": self.problem.io_mode
+        }
+
+        with ChooseJudgeServer() as server:
+            if not server:
+                return
+            resp = self._request(urljoin(server.service_url, "/judge"), data=data)
+
+        if not resp:
+            return
+
+        if not resp["err"]:
+            resp["data"] = resp["data"][0] # first testcase only
+
+        return resp
