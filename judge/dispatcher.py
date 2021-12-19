@@ -407,11 +407,12 @@ class JudgeDispatcher(DispatcherBase):
         rank.save()
 
 class JudgeSampleTester(DispatcherBase):
-    def __init__(self, src, language, problem_id):
+    def __init__(self, src, language, problem_id, test_case):
         super().__init__()
         self.code = src
         self.language = language
         self.problem = Problem.objects.get(id=problem_id)
+        self.test_case = [test_case]
 
     def judge(self):
         language = self.language
@@ -434,7 +435,7 @@ class JudgeSampleTester(DispatcherBase):
             "src": code,
             "max_cpu_time": self.problem.time_limit,
             "max_memory": 1024 * 1024 * self.problem.memory_limit,
-            "test_case_id": self.problem.test_case_id,
+            "test_case": self.test_case,
             "output": True,
             "spj_version": self.problem.spj_version,
             "spj_config": spj_config.get("config"),

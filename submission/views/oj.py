@@ -15,7 +15,7 @@ from utils.captcha import Captcha
 from utils.throttling import TokenBucket
 from ..models import Submission
 from ..serializers import (CreateSubmissionSerializer, SubmissionModelSerializer,
-                           ShareSubmissionSerializer)
+                           ShareSubmissionSerializer, SampleTestSerializer)
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
 
 
@@ -264,7 +264,7 @@ class SampleTestAPI(APIView):
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
                     return self.error("Your IP is not allowed in this contest")
 
-    @validate_serializer(CreateSubmissionSerializer)
+    @validate_serializer(SampleTestSerializer)
     @login_required
     def post(self, request):
         data = request.data
@@ -295,8 +295,6 @@ class SampleTestAPI(APIView):
             return self.error("Problem not exist")
         if data["language"] not in problem.languages:
             return self.error(f"{data['language']} is now allowed in the problem")
-        if problem.sampletest == False:
-            return self.error("Sample test is not supported in this problem.")
 
-        resp = JudgeSampleTester(data['code'], data['language'], data['problem_id']).judge()
+        resp = JudgeSampleTester(data['code'], data['language'], data['problem_id'], data['test_case']).judge()
         return self.success(resp)

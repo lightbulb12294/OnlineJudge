@@ -2,6 +2,9 @@ from .models import Submission
 from utils.api import serializers
 from utils.serializers import LanguageNameChoiceField
 
+class SampleSerializer(serializers.Serializer):
+    input = serializers.CharField(trim_whitespace=False)
+    output = serializers.CharField(trim_whitespace=False)
 
 class CreateSubmissionSerializer(serializers.Serializer):
     problem_id = serializers.IntegerField()
@@ -49,3 +52,11 @@ class SubmissionListSerializer(serializers.ModelSerializer):
         if self.user is None or not self.user.is_authenticated:
             return False
         return obj.check_user_permission(self.user)
+
+class SampleTestSerializer(serializers.Serializer):
+    problem_id = serializers.IntegerField()
+    language = LanguageNameChoiceField()
+    code = serializers.CharField(max_length=1024 * 1024)
+    contest_id = serializers.IntegerField(required=False)
+    captcha = serializers.CharField(required=False)
+    test_case = serializers.DictField(child=serializers.CharField(max_length=256 * 1024, allow_blank=True))
