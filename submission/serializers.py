@@ -59,4 +59,4 @@ class SampleTestSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=1024 * 1024)
     contest_id = serializers.IntegerField(required=False)
     captcha = serializers.CharField(required=False)
-    test_case = serializers.DictField(child=serializers.CharField(max_length=256 * 1024, allow_blank=True))
+    test_case = serializers.DictField(child=serializers.CharField(max_length=256 * 1024, allow_blank=True, trim_whitespace=False))
