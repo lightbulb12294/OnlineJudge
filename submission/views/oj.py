@@ -1,5 +1,3 @@
-import ipaddress
-
 from django.utils.timezone import now
 from django.db.models import Q
 from account.decorators import login_required, check_contest_permission
@@ -42,11 +40,6 @@ class SubmissionAPI(APIView):
         contest = self.contest
         if contest.status == ContestStatus.CONTEST_ENDED:
             return self.error("The contest have ended")
-        if not request.user.is_contest_admin(contest):
-            user_ip = ipaddress.ip_address(request.session.get("ip"))
-            if contest.allowed_ip_ranges:
-                if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
-                    return self.error("Your IP is not allowed in this contest")
 
     @validate_serializer(CreateSubmissionSerializer)
     @login_required
@@ -258,11 +251,6 @@ class SampleTestAPI(APIView):
         contest = self.contest
         if contest.status == ContestStatus.CONTEST_ENDED:
             return self.error("The contest have ended")
-        if not request.user.is_contest_admin(contest):
-            user_ip = ipaddress.ip_address(request.session.get("ip"))
-            if contest.allowed_ip_ranges:
-                if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
-                    return self.error("Your IP is not allowed in this contest")
 
     @validate_serializer(SampleTestSerializer)
     @login_required
