@@ -8,6 +8,8 @@ from utils.api import JSONResponse, APIError
 from utils.constants import CONTEST_PASSWORD_SESSION_KEY
 from .models import ProblemPermission
 
+import ipaddress
+
 
 class BasePermissionDecorator(object):
     def __init__(self, func):
@@ -121,6 +123,13 @@ def check_contest_permission(check_type="details"):
                 # password error
                 if not check_contest_password(request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(self.contest.id), self.contest.password):
                     return self.error("Wrong password or password expired")
+
+            # check IP address
+            if check_type != "details" and check_type != "ranks":
+                if self.contest.allowed_ip_ranges:
+                    user_ip = ipaddress.ip_address(request.session.get("ip"))
+                    if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in self.contest.allowed_ip_ranges):
+                        return self.error("Your IP is not allowed in this contest")
 
             # regular user get contest problems, ranks etc. before contest started
             if self.contest.status == ContestStatus.CONTEST_NOT_START and check_type != "details":
