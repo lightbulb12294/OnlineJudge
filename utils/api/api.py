@@ -75,9 +75,39 @@ class APIView(View):
             else:
                 raise ValueError("unknown content_type '%s'" % content_type)
             if body:
-                return parser.parse(body)
-            return {}
-        return request.GET
+                data = parser.parse(body)
+            else:
+                data = {}
+        else:
+            data = request.GET
+        # fix request network error: replace back to "() {" if needed
+        def replace_back(memo):
+            def check(x):
+                if isinstance(x, dict) == False:
+                    return False
+                if "text" not in x or "replace" not in x:
+                    return False
+                if len(x.keys()) != 2:
+                    return False
+                return True
+            if isinstance(memo, dict):
+                for k in memo.keys():
+                    if check(memo[k]):
+                        text = list(memo[k]["text"])
+                        for i in memo[k]["replace"]:
+                            text[i] = ' '
+                        memo[k] = "".join(text)
+                    else: replace_back(memo[k])
+            if isinstance(memo, list):
+                for k in range(len(memo)):
+                    if check(memo[k]):
+                        text = list(memo[k]["text"])
+                        for i in memo[k]["replace"]:
+                            text[i] = ' '
+                        memo[k] = "".join(text)
+                    else: replace_back(memo[k])
+        replace_back(data)
+        return data
 
     def response(self, data):
         return self.response_class.response(data)
