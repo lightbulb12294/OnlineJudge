@@ -33,17 +33,6 @@ from ..utils import TEMPLATE_BASE, build_problem_template
 
 
 class TestCaseZipProcessor(object):
-    def _rstrip_content(self, byte_content):
-        '''
-        - strip trailing space for each line in answer file
-        - note that judge-server should strip the user output in the same way so that the
-            hash will be identical
-        '''
-        stream = io.StringIO(byte_content.decode())
-        stripped_lines = [line.rstrip() for line in stream.readlines()]
-        byte_content = '\n'.join(stripped_lines).encode()
-        return byte_content
-
     def process_zip(self, uploaded_zip_file, spj, dir=""):
         try:
             zip_file = zipfile.ZipFile(uploaded_zip_file, "r")
@@ -64,7 +53,12 @@ class TestCaseZipProcessor(object):
 
         for item in test_case_list:
             with open(os.path.join(test_case_dir, item), "wb") as f:
-                content = self._rstrip_content(zip_file.read(f"{dir}{item}"))
+                '''
+                - strip trailing space for each line in IO files
+                - note that judge-server should strip the files in the same way so that the
+                  hash will be identical
+                '''
+                content = b'\n'.join([line.rstrip() for line in zip_file.read(f"{dir}{item}").split(b'\n')])
                 size_cache[item] = len(content)
                 if item.endswith(".out"):
                     md5_cache[item] = hashlib.md5(content.rstrip()).hexdigest()
