@@ -26,22 +26,36 @@ class UserAdminAPI(APIView):
         """
         data = request.data["users"]
 
-        user_list = []
+        err = None
         for user_data in data:
             if len(user_data) != 4 or len(user_data[0]) > 32:
                 return self.error(f"Error occurred while processing data '{user_data}'")
-            user_list.append(User(username=user_data[0], password=make_password(user_data[1]), email=user_data[2]))
+            try:
+                with transaction.atomic():
+                    ret = User.objects.create(username=user_data[0], password=make_password(user_data[1]), email=user_data[2])
+                    UserProfile.objects.create(user=ret, real_name=user_data[3])
+            except IntegrityError as e:
+                if err is None: err = str(e).split("\n")[1]
+        if err is None: return self.success()
+        else: return self.error(e)
+        # TODO: fix server error while importing duplicate user
 
-        try:
-            with transaction.atomic():
-                ret = User.objects.bulk_create(user_list)
-                UserProfile.objects.bulk_create([UserProfile(user=ret[i], real_name=data[i][3]) for i in range(len(ret))])
-            return self.success()
-        except IntegrityError as e:
-            # Extract detail from exception message
-            #    duplicate key value violates unique constraint "user_username_key"
-            #    DETAIL:  Key (username)=(root11) already exists.
-            return self.error(str(e).split("\n")[1])
+        # user_list = []
+        # for user_data in data:
+        #     if len(user_data) != 4 or len(user_data[0]) > 32:
+        #         return self.error(f"Error occurred while processing data '{user_data}'")
+        #     user_list.append(User(username=user_data[0], password=make_password(user_data[1]), email=user_data[2]))
+
+        # try:
+        #     with transaction.atomic():
+        #         ret = User.objects.bulk_create(user_list)
+        #         UserProfile.objects.bulk_create([UserProfile(user=ret[i], real_name=data[i][3]) for i in range(len(ret))])
+        #     return self.success()
+        # except IntegrityError as e:
+        #     # Extract detail from exception message
+        #     #    duplicate key value violates unique constraint "user_username_key"
+        #     #    DETAIL:  Key (username)=(root11) already exists.
+        #     return self.error(str(e).split("\n")[1])
 
     @validate_serializer(EditUserSerializer)
     @super_admin_required
