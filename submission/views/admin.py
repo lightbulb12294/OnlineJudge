@@ -4,7 +4,6 @@ from judge.tasks import judge_task
 from utils.api import APIView
 from ..models import Submission
 from account.models import User
-from django.db.models import Max
 from problem.models import Problem
 from contest.models import Contest
 
@@ -24,18 +23,22 @@ class SubmissionRejudgeAPI(APIView):
         judge_task.send(submission.id, submission.problem.id)
         return self.success()
 
-        return self.success({
-            "rejudged_count": len(result),
-            "dry_run": dry_run,
-            "submissions": result
-        })
 class SubmissionRejudgeLastAPI(APIView):
-
+    """
+    API to rejudge the last submission(s) for a specific contest or problem.
+    Note: This API has no frontend UI.
+    
+    Usage (GET):
+    - contest_id OR contestID: Filter by contest ID.
+    - problem_id OR problemID: Filter by problem display ID.
+    
+    Example: 
+    /api/admin/submission/rejudge_last?contest_id=<contest_id>&problemID=<problem_id>
+    """
     @super_admin_required
     def get(self, request):
         contest_id = request.GET.get("contest_id") or request.GET.get("contestID")
-        problem_display_id = request.GET.get("problemID")
-        dry_run = request.GET.get("dry_run") == "1"
+        problem_display_id = request.GET.get("problem_id") or  request.GET.get("problemID")
 
         if not contest_id:
             return self.error("Parameter error, contest_id is required")
@@ -86,15 +89,8 @@ class SubmissionRejudgeLastAPI(APIView):
                 "create_time": str(submission.create_time)
             })
 
-            if dry_run:
-                continue
-
             submission.statistic_info = {}
             submission.save(update_fields=["statistic_info"])
             judge_task.send(submission.id, submission.problem.id)
 
-        return self.success({
-            "rejudged_count": len(result),
-            "dry_run": dry_run,
-            "sample_submissions": result[:10]
-        })
+        return self.success()
