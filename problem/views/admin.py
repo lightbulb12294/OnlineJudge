@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 # import shutil
@@ -52,7 +53,12 @@ class TestCaseZipProcessor(object):
 
         for item in test_case_list:
             with open(os.path.join(test_case_dir, item), "wb") as f:
-                content = zip_file.read(f"{dir}{item}").replace(b"\r\n", b"\n")
+                '''
+                - strip trailing space for each line in IO files
+                - note that judge-server should strip the files in the same way so that the
+                  hash will be identical
+                '''
+                content = b'\n'.join([line.rstrip() for line in zip_file.read(f"{dir}{item}").split(b'\n')])
                 size_cache[item] = len(content)
                 if item.endswith(".out"):
                     md5_cache[item] = hashlib.md5(content.rstrip()).hexdigest()
